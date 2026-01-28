@@ -1,0 +1,406 @@
+
+\documentclass{beamer}
+\usetheme{Madrid}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\title{Attention Is All You Need}
+\author{}
+\begin{document}
+\frame{\titlepage}
+\begin{frame}{Abstract}
+The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable and requiring significantly less time to train. Our model achieves 28.4 BLEU on the WMT 2014 English-to-German translation task, improving over the existing best results, including ensembles, by over 2 BLEU. On the WMT 2014 English-to-French translation task, our model establishes a new single-model state-of-the-art BLEU score of 41.8 after training for 3.5 days on eight GPUs, a small fraction of the training costs of the best models from the literature. We show that the Transformer generalizes well to other tasks by applying it successfully to English constituency parsing both with large and limited training data. % %TODO(noam): update results for new models. %llion@: FAIR's paper seems to concentrate solely on the convolutional aspect of their model and have the attention as an after thought almost, this gives us a good opportunity to differentiate ourselves from their paper. %We are simpler in a number of ways and should have the simplicity as a big selling point: % % No convolutions % No need for such careful initializations and %normalization. % Simpler non-lineararities, they use the gated linear %units. % Less layers? % %One thing we do more is that we have self attention. %Another selling point is the increased interpretability as %shown with the visualizations. Which comes from the %simplicity and use of only attentions.
+\end{frame}
+
+\begin{frame}{Introduction to Sequence Modeling}
+\begin{itemize}
+\item Overview of sequence modeling and its significance in various domains.
+\item Introduction to Recurrent Neural Networks (RNNs) and their variants (LSTM, GRU) as state-of-the-art techniques.
+\item Common applications include language modeling, machine translation, and speech recognition.
+\item Current trends focus on enhancing recurrent architectures and encoder-decoder models.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Challenges with Recurrent Models}
+\begin{itemize}
+\item Sequential computation of hidden states limits parallelization and increases training time.
+\item Memory constraints hinder effective batching across long sequences.
+\item Time complexity is linear with respect to input/output length, impacting training efficiency.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Advancements in Computational Efficiency}
+\begin{itemize}
+\item Recent techniques improve efficiency through factorization and conditional computation.
+\item Despite advancements, the fundamental constraint of sequential computation remains.
+\item Introduction of attention mechanisms has revolutionized sequence modeling by enabling long-range dependencies.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{The Transformer Model}
+\begin{itemize}
+\item Introduces a novel architecture that relies solely on attention mechanisms.
+\item Eliminates recurrence, allowing for significant parallelization.
+\item Achieves state-of-the-art translation quality with reduced training time and improved scalability.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Attention Mechanisms in Sequence Models}
+\begin{itemize}
+\item Attention mechanisms are essential in modern sequence models, particularly for tasks like machine translation.
+\item State-of-the-art results in machine translation increasingly depend on attention-based architectures.
+\item Recent research explores self-attention and its transformative impact on model performance.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Future Directions}
+\begin{itemize}
+\item Exploration of constructing states based on actual inputs/outputs for improved model performance.
+\item Investigation of models like Bytenet and Facenet for enhanced computational efficiency.
+\item Ongoing research into attention mechanisms and their applications in large-scale datasets and diverse tasks.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Background: Sequential Computation in Neural Models}
+\begin{itemize}
+\item Goal: Reduce sequential computation in neural architectures.
+\item Models: Extended Neural GPU, ByteNet, ConvS2S.
+\item Basic Building Block: Convolutional Neural Networks.
+\item Parallel Computation: Enables hidden representations for all input/output positions.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Challenges in Existing Models}
+\begin{itemize}
+\item Operation Growth: Varies based on distance between input/output positions.
+\item ConvS2S: Exhibits linear growth of operations.
+\item ByteNet: Demonstrates logarithmic growth of operations.
+\item Difficulty: Learning dependencies between distant positions remains a challenge.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Transformer Model Overview}
+\begin{itemize}
+\item Constant Operations: Reduces operations to a fixed number, enhancing efficiency.
+\item Trade-off: Reduced effective resolution due to averaging attention-weighted positions.
+\item Multi-Head Attention: Mitigates resolution reduction by capturing diverse relationships.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Self-Attention Mechanism}
+\begin{itemize}
+\item Definition: Relates different positions within a single sequence.
+\item Purpose: Computes comprehensive representations of the sequence.
+\item Applications: Effective in reading comprehension, summarization, entailment, and sentence representations.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{End-to-End Memory Networks}
+\begin{itemize}
+\item Foundation: Built on a recurrent attention mechanism.
+\item Performance: Effective in simple-language question answering and language modeling tasks.
+\item Significance: First transduction model utilizing only self-attention mechanisms.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Advantages of Self-Attention}
+\begin{itemize}
+\item Computational Efficiency: Facilitates low-cost connections across multiple positions.
+\item Potential: Can replace recurrence with attention for enhanced efficiency.
+\item Results: Achieved state-of-the-art performance in machine translation tasks.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Recurrent Models vs. Attention Models}
+\begin{itemize}
+\item Recurrent Models: Compute hidden states sequentially, leading to inefficiencies.
+\item Attention Models: Compute hidden states independently of previous time steps.
+\item Impact: Enables faster training and better scalability over large datasets.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Conclusion and Future Directions}
+\begin{itemize}
+\item Self-Attention: Central to efficient sequence modeling.
+\item Future Work: Investigate further applications and enhancements.
+\item Goal: Improve computational efficiency and overall model performance.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Model Architecture Overview}
+\begin{itemize}
+\item Overview of the encoder-decoder structure in sequence-to-sequence models
+\item Encoder computes a representation of the input sequence
+\item Decoder generates the output sequence autoregressively
+\item Incorporates attention mechanisms and position-wise feed-forward layers
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Encoder Structure}
+\begin{itemize}
+\item Encoder consists of N=6 identical layers
+\item Each layer includes two sub-layers:
+\item 1. Multi-head self-attention mechanism
+\item 2. Position-wise fully connected feed-forward network
+\item Residual connections and layer normalization are applied
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Decoder Structure and Functionality}
+\begin{itemize}
+\item Decoder consists of N=6 identical layers
+\item Includes an additional sub-layer for encoder-decoder attention
+\item Utilizes masking to prevent positions from attending to subsequent positions
+\item Ensures predictions depend solely on known outputs
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Attention Mechanism}
+\begin{itemize}
+\item Maps query and key-value pairs to output
+\item Output is a weighted sum of values based on query-key compatibility
+\item Employs Scaled Dot-Product Attention for efficiency
+\item Attention function computed on matrices Q (queries), K (keys), V (values)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Multi-Head Attention}
+\begin{itemize}
+\item Projects queries, keys, and values into lower-dimensional spaces
+\item Performs attention function in parallel across multiple heads
+\item Enables the model to attend to diverse representation subspaces
+\item Utilizes h=8 parallel attention layers with d_k=d_v=64
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Feed-Forward Networks}
+\begin{itemize}
+\item Each layer contains a position-wise feed-forward network
+\item Comprises two linear transformations with ReLU activation
+\item Input and output dimensionality: 512
+\item Inner-layer dimensionality: d_ff=2048
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Positional Encoding}
+\begin{itemize}
+\item Injects information about token positions within the sequence
+\item Positional encodings are added to input embeddings
+\item Utilizes sine and cosine functions of varying frequencies
+\item Facilitates the model's ability to learn relative positions effectively
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Introduction to Self-Attention}
+\begin{itemize}
+\item Overview of self-attention mechanism in neural networks
+\item Mapping variable-length sequences: x_1, ..., x_n to y_1, ..., y_n
+\item Comparison with recurrent and convolutional layers
+\item Focus on computational complexity, parallelization, and path length
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Key Aspects of Self-Attention}
+\begin{itemize}
+\item Computational Complexity: Total operations per layer
+\item Parallelization: Minimum sequential operations required
+\item Path Length: Distance between long-range dependencies
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Comparison of Layer Types}
+\begin{itemize}
+\item Self-Attention: O(n^2 d), O(1) sequential ops, O(1) max path length
+\item Recurrent: O(n d^2), O(n) sequential ops, O(n) max path length
+\item Convolutional: O(k n d^2), O(1) sequential ops, O(log_k(n)) max path length
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Efficiency of Self-Attention}
+\begin{itemize}
+\item Efficient for cross-positional communication when sequence length < channel depth
+\item Self-attention connects all positions with constant sequential operations
+\item Comparison with recurrent layers requiring O(n) sequential operations
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Computational Performance}
+\begin{itemize}
+\item Self-attention faster than recurrent layers when n < d
+\item Potential for restricted self-attention to improve performance on long sequences
+\item Maximum path length increases to O(n/r) with restricted attention
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Convolutional Layers Complexity}
+\begin{itemize}
+\item Single convolutional layer with kernel width k < n does not connect all positions
+\item Stack of O(n/k) layers needed for contiguous kernels
+\item Separable convolutions reduce complexity to O(k n d + n d^2)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Unfiltered Bottleneck Argument}
+\begin{itemize}
+\item Recurrent and convolutional layers compress information to fixed-length vectors
+\item Self-attention aggregates information after filtering, reducing irrelevant data
+\item Potential for more interpretable models with self-attention
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Conclusion}
+\begin{itemize}
+\item Self-attention offers advantages in computational efficiency and path length
+\item Facilitates learning long-range dependencies
+\item Potential for improved interpretability in models
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Training Regime Overview}
+\begin{itemize}
+\item Training conducted on WMT 2014 English-German and English-French datasets
+\item English-German: ~4.5 million sentence pairs
+\item English-French: ~36 million sentence pairs
+\item Byte-pair encoding used for tokenization
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Dataset Details}
+\begin{itemize}
+\item English-German: 37,000 shared source-target vocabulary
+\item English-French: 32,000 word-piece vocabulary
+\item Sentence pairs batched by approximate sequence length
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Training Setup}
+\begin{itemize}
+\item Trained on 8 NVIDIA P100 GPUs
+\item Base models: 100,000 steps (~12 hours)
+\item Big models: 300,000 steps (~3.5 days)
+\item Base model step time: ~0.4 seconds
+\item Big model step time: ~1.0 seconds
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Optimizer and Learning Rate}
+\begin{itemize}
+\item Adam optimizer used with parameters: β1=0.9, β2=0.98, ε=10^-9
+\item Learning rate formula: lrate = step_num^-0.5 * min(step_num^-0.5, warmup_steps^-1.5)
+\item Warmup steps: 4,000
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Regularization Techniques}
+\begin{itemize}
+\item Dropout applied to sub-layer outputs before normalization
+\item Dropout on sums of embeddings and positional encodings
+\item Base model dropout rate: P_drop=0.1
+\item Attention dropout rates tested: 0.2 and 0.3
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Additional Regularization}
+\begin{itemize}
+\item Label smoothing employed with value: ls=0.1
+\item Improves accuracy and BLEU score despite increased perplexity
+\item Symbol dropout rate for target IDs: symbol_dropout_rate=0.1
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Model Performance Comparison}
+\begin{itemize}
+\item Comparison of translation quality (cBLEU) and training cost (FLOPs) for various models.
+\item Models evaluated: ByteNet, Deep-Att + PosUnk, GNMT + RL, ConvS2S, MoE, Transformer.
+\item Transformer (big) achieves state-of-the-art BLEU score of 28.4 on EN-DE task.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Training Costs and BLEU Scores}
+\begin{itemize}
+\item Training costs (FLOPs) and BLEU scores for models on EN-DE and EN-FR tasks:
+\item ByteNet: EN-DE - 23.75, EN-FR - N/A, BLEU - N/A
+\item Deep-Att + PosUnk: EN-DE - N/A, EN-FR - 39.2, Costs - 1.01e20, BLEU - N/A
+\item GNMT + RL: EN-DE - 24.6, EN-FR - 39.92, Costs - 2.31e19, 1.41e20, BLEU - N/A
+\item ConvS2S: EN-DE - 25.16, EN-FR - 40.46, Costs - 9.61e18, 1.51e20, BLEU - N/A
+\item MoE: EN-DE - 26.03, EN-FR - 40.56, Costs - 2.01e19, 1.21e20, BLEU - N/A
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Transformer Model Details}
+\begin{itemize}
+\item Transformer (base model) configuration:
+\item 6 attention layers, 512 hidden dimensions, 2048 filter dimensions, 8 attention heads.
+\item Training time: 3.5 days on 8 P100 GPUs.
+\item Base model BLEU score: 25.8, surpasses all previously published models.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Hyperparameter Tuning}
+\begin{itemize}
+\item Hyperparameters for Transformer (big) model:
+\item Dropout rate: P_drop = 0.1 (instead of 0.3).
+\item Beam search with size 4 and length penalty = 0.6.
+\item Maximum output length: input length + 50.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Impact of Model Variations}
+\begin{itemize}
+\item Varying attention heads and dimensions affects performance:
+\item Single-head attention is 0.9 BLEU worse than optimal settings.
+\item Reducing attention key size (d_k) negatively impacts quality.
+\item Larger models yield better performance; dropout helps prevent overfitting.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{English Constituency Parsing Results}
+\begin{itemize}
+\item Transformer evaluated on English constituency parsing with WSJ dataset.
+\item 4-layer transformer trained on 40K sentences.
+\item Achieved F1 score of 91.3, outperforming previous models.
+\item Semi-supervised training with larger corpora yielded F1 score of 92.7.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Introduction to the Transformer Model}
+\begin{itemize}
+\item Introduction of the Transformer model based entirely on attention mechanisms.
+\item Replaces recurrent layers in encoder-decoder architectures with multi-headed self-attention.
+\item Key innovations that enable parallelization and improved performance.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Performance Achievements}
+\begin{itemize}
+\item Achieved new state-of-the-art results on WMT 2014 English-to-German and English-to-French translation tasks.
+\item Best model outperforms all previously reported ensembles in the English-to-German task.
+\item Quantitative metrics demonstrating performance improvements.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Future Directions}
+\begin{itemize}
+\item Exploration of broader applicability of attention-based models across various domains.
+\item Plans to extend the Transformer architecture to other input/output modalities (e.g., images, audio, video).
+\item Investigation of local, restricted attention mechanisms for handling large inputs/outputs efficiently.
+\item Goals to enhance generation processes to reduce sequential dependencies.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Conclusion}
+\begin{itemize}
+\item Summary of the Transformer model's advantages over traditional architectures.
+\item Implications of faster training and improved performance for real-world applications.
+\item Future research opportunities stemming from the Transformer framework.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Acknowledgments}
+\begin{itemize}
+\item Gratitude to Nal Kalchbrenner and Stephan Gouws for their insightful comments and inspiration.
+\item Code for training and evaluation of models is publicly available for further research.
+\end{itemize}
+\end{frame}
+
+\end{document}
