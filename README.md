@@ -1,11 +1,10 @@
 # TeX2Slides — Self-Reflective LLM Agent for Paper → Slides
 
 TeX2Slides is a self-reflective LLM agent that converts a LaTeX research paper into
-high-quality presentation slides.
+professional presentation slides, with a PPTX-first workflow.
 
-Supported outputs:
-- Beamer (PDF)
-- PowerPoint (PPTX)
+Supported output:
+- PowerPoint (PPTX) — primary and canonical renderer
 
 The system follows a Planner → Reflector → Executor architecture:
 - The LLM plans slide content
@@ -21,9 +20,8 @@ The system follows a Planner → Reflector → Executor architecture:
   - Handles \input{} and \include{}
 - LLM-based slide planning
 - Self-reflection for quality improvement
-- Generates self-contained slides (not only oral-presentation slides)
-- Beamer to PDF via local compilation
-- PowerPoint generation using python-pptx
+-- Generates self-contained slides (not only oral-presentation slides)
+-- PowerPoint generation using python-pptx
 - Clear separation of reasoning and execution
 - Fully controllable and auditable pipeline
 
@@ -41,11 +39,10 @@ LLM Reflector (refinement)
 ↓  
 Final Slide Plan (JSON)  
 ↓  
-Executor  
-- Beamer (.tex → PDF)  
+Executor
 - PowerPoint (.pptx)
 
-The LLM never directly accesses files or tools.  
+The LLM never directly accesses files or tools.
 It only produces structured JSON plans.
 
 ---
@@ -54,11 +51,13 @@ It only produces structured JSON plans.
 
 ```
 tex2slides_agent/
-├── main.py
-├── latex_parser.py
-├── llm_agent.py
-├── beamer_executor.py
-├── pptx_executor.py
+├── main.py             # CLI (PPTX-first)
+├── src/
+│   ├── cli/
+│   ├── parser/
+│   ├── llm/
+│   └── executors/      # includes pptx_executor (single backend)
+├── pptx_executor.py    # top-level shim
 ├── requirements.txt
 └── README.md
 ```
@@ -67,8 +66,7 @@ tex2slides_agent/
 
 ## Input Format
 
-Input must be the root LaTeX file of the paper
-(the same file you would compile with pdflatex).
+Input must be the root LaTeX file of the paper.
 
 Examples:
 - iclr2023_conference.tex
@@ -84,67 +82,35 @@ Do NOT pass:
 
 ## Installation
 
-### Clone the repository
+Clone the repository and install the Python dependencies:
+
 ```bash
 git clone https://github.com/<your-username>/tex2slides_agent.git
 cd tex2slides_agent
-```
-
-### Install Python dependencies
-```bash
 pip install -r requirements.txt
 ```
 
-### Install LaTeX (for Beamer)
-
-macOS:
-```bash
-brew install --cask basictex
-```
-
-Add LaTeX to PATH:
-```bash
-echo 'export PATH="/Library/TeX/texbin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-Verify:
-```bash
-pdflatex --version
-```
+This project is now PPTX-first and has no runtime LaTeX compilation dependency.
 
 ---
 
 ## Usage
 
-### Generate Beamer Slides (PDF)
+### Generate PowerPoint Slides (PPTX-first)
+
+Usage:
 
 ```bash
-python main.py \
-  --input path/to/main.tex \
-  --api-key YOUR_OPENAI_API_KEY \
-  --format beamer \
-  --out paper_slides.tex
+python main.py --input path/to/main.tex --api-key YOUR_OPENAI_API_KEY --out paper_slides.pptx
 ```
 
-Compile to PDF:
-```bash
-pdflatex paper_slides.tex
-pdflatex paper_slides.tex
-open paper_slides.pdf
-```
-
----
-
-### Generate PowerPoint Slides
+Optional: export the generated PPTX to PDF using a headless LibreOffice if available:
 
 ```bash
-python main.py \
-  --input path/to/main.tex \
-  --api-key YOUR_OPENAI_API_KEY \
-  --format pptx \
-  --out paper_slides.pptx
+python main.py --input path/to/main.tex --api-key YOUR_OPENAI_API_KEY --out paper_slides.pptx --export-pdf
 ```
+
+If LibreOffice is not installed, the CLI will keep the PPTX output and report that PDF export was skipped.
 
 ### Example: Planner + Refiner (Professor / Teaching POV)
 
@@ -185,18 +151,12 @@ print(refined)
 
 ## Features: Q&A Slides & References
 
-When using the professor perspective, the planner automatically includes:
+When using the professor perspective, the planner automatically includes Q&A slides and references.
 
-- **Q&A Slides**: Marked with `"qa_slide": true`, these appear after major sections to prompt
-  student discussion and reflection. Include a `"qa_text"` field with discussion prompts.
+- Q&A slides are marked with `"qa_slide": true` (or `"qa_text"`) and appear after major sections to prompt discussion.
+- References are provided via a `"references"` array when applicable; each reference may be a string or an object with a `text` field.
 
-- **References & Citations**: Slides include a `"references"` array only when relevant. Each reference can be:
-  - **Paper**: `{"type": "paper", "source": "Paper: Section X", "text": "..."}`
-  - **External**: `{"type": "external", "source": "Source name", "text": "..."}`
-  - **AI Recommendation**: `{"type": "ai_recommendation", "source": "AI-generated", "text": "..."}`
-  
-  References appear in smaller text at the bottom of slides. Paper citations take priority;
-  AI-generated additions are clearly labeled so instructors can decide whether to include them.
+The PPTX executor renders these slide types with graceful fallbacks and modest styling metadata.
 
 ---
 
@@ -215,6 +175,25 @@ Each round:
 - Outputs a refined plan and brief critique summary
 
 Default: 2 rounds. Increase `rounds` for more thorough optimization on complex sections.
+
+---
+
+## Aesthetic Design & Visual Styling
+
+Every slide includes rich styling metadata for beautiful, professional rendering:
+
+**Styling Fields:**
+- `background_color`: Slide background color (hex, e.g., `"#FFFFFF"`)
+- `text_color`: Primary text color (e.g., `"#333333"`)
+- `accent_color`: Highlight/emphasis color (e.g., `"#2E7D32"`)
+- `visual_type`: Slide category (`"technical"`, `"analogy"`, `"qa"`, `"intro"`, `"summary"`)
+- `visual_emphasis`: Array of bullet indices to highlight for visual prominence
+- `illustration_hint`: Optional suggestion for diagrams, icons, or visual aids
+
+Styling fields are supported by the PPTX executor (simple, optional):
+- `background_color`, `text_color`, `accent_color`, `visual_type` (`technical`, `analogy`, `qa`, etc.), and `visual_emphasis`.
+
+Executors make best-effort use of these fields; if styling is missing the renderer falls back to a readable default.
 
 ---
 
