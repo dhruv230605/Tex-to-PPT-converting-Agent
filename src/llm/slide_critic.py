@@ -43,7 +43,6 @@ Draft slide plan:
             user_prompt=reflection_prompt,
         )
 
-        # Try to extract JSON (caller may parse)
         try:
             return self._extract_json(result)
         except Exception:

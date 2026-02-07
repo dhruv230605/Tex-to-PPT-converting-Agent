@@ -1,49 +1,56 @@
 # TeX2Slides — Self-Reflective LLM Agent for Paper → Slides
 
-TeX2Slides is a self-reflective LLM agent that converts a LaTeX research paper into
-professional presentation slides, with a PPTX-first workflow.
+TeX2Slides is a self-reflective LLM agent that converts LaTeX research papers into
+professional PowerPoint presentations using intelligent planning and optional LLM-driven reflection.
 
-Supported output:
-- PowerPoint (PPTX) — primary and canonical renderer
+**Output Format:**
+- PowerPoint (PPTX) — primary and only renderer
 
-The system follows a Planner → Reflector → Executor architecture:
-- The LLM plans slide content
-- The LLM reflects and improves its own output
-- Deterministic executors generate the final slides
-- No agent frameworks (AutoGen, LangGraph, n8n, etc.) are used
+**Architecture:**
+Planner → Refiner → StyleAgent (with optional LLM reflection) → PPTX Executor
+
+- The LLM plans slide content from paper sections
+- The LLM refines through multi-round critique loops
+- The StyleAgent optimizes design (deterministic or LLM-driven reflection)
+- A deterministic executor generates final PPTX files
+- No agent frameworks required (AutoGen, LangGraph, n8n, etc.)
 
 ---
 
 ## Features
 
-- Supports real multi-file LaTeX projects
-  - Handles \input{} and \include{}
-- LLM-based slide planning
-- Self-reflection for quality improvement
--- Generates self-contained slides (not only oral-presentation slides)
--- PowerPoint generation using python-pptx
-- Clear separation of reasoning and execution
-- Fully controllable and auditable pipeline
+- **Multi-file LaTeX support** — handles `\input{}` and `\include{}` directives
+- **LLM-based planning** — extracts sections and figures into structured slide plans
+- **Multi-round refinement** — iterative critique loop for content improvement
+- **Optional LLM reflection** — advanced design critique with `--use-reflection` flag
+- **Template support** — optional PPTX master slide compatibility via `--template` flag
+- **Smart text handling** — automatic bullet conversion, emoji/LaTeX cleanup, word wrapping
+- **Image embedding** — PNG, JPG, SVG support (PDF images gracefully skipped)
+- **Analogy & Q&A slides** — specialized layouts with strict Comic Sans MS 28pt styling
+- **Clear architecture** — LLM produces auditable JSON plans; executor is pure deterministic
+- **No LaTeX dependencies** — pure Python pipeline; no pdflatex, dvips, or Beamer required
 
 ---
 
-## Agent Architecture
+## Pipeline Architecture
 
-LaTeX Source (.tex)  
-↓  
-Parser (structure + figures)  
-↓  
-LLM Planner (draft slides)  
-↓  
-LLM Reflector (refinement)  
-↓  
-Final Slide Plan (JSON)  
-↓  
-Executor
-- PowerPoint (.pptx)
+```
+LaTeX Paper (.tex)
+    ↓
+[Parser] Extract sections, figures, metadata
+    ↓
+[SlidePlanner] LLM: generate initial slide plan (JSON)
+    ↓
+[SlideRefiner] LLM: multi-round critique + refinement
+    ↓
+[StyleAgent] Optimize design (deterministic or LLM-driven)
+    ↓
+[PPTX Executor] Generate PowerPoint file
+    ↓
+paper_slides.pptx ✓
+```
 
-The LLM never directly accesses files or tools.
-It only produces structured JSON plans.
+All LLM outputs are structured JSON; executors never make API calls.
 
 ---
 
@@ -51,15 +58,22 @@ It only produces structured JSON plans.
 
 ```
 tex2slides_agent/
-├── main.py             # CLI (PPTX-first)
 ├── src/
 │   ├── cli/
+│   │   └── main.py          # CLI entrypoint
 │   ├── parser/
+│   │   └── latex_parser.py  # LaTeX → JSON extractor
 │   ├── llm/
-│   └── executors/      # includes pptx_executor (single backend)
-├── pptx_executor.py    # top-level shim
+│   │   ├── llm_base.py      # Shared LLM infrastructure
+│   │   ├── slide_planner.py # Initial slide planning
+│   │   ├── slide_refiner.py # Multi-round refinement
+│   │   ├── slide_critic.py  # Critique logic
+│   │   └── style_agent.py   # Design optimization + reflection
+│   └── executors/
+│       └── pptx_executor.py # PPTX renderer (sole backend)
 ├── requirements.txt
-└── README.md
+├── README.md
+└── outputs/                 # Generated slides (e.g., paper_slides.pptx)
 ```
 
 ---
@@ -96,73 +110,112 @@ This project is now PPTX-first and has no runtime LaTeX compilation dependency.
 
 ## Usage
 
-### Generate PowerPoint Slides (PPTX-first)
-
-Usage:
+### Basic: Generate PPTX Slides
 
 ```bash
-python main.py --input path/to/main.tex --api-key YOUR_OPENAI_API_KEY --out paper_slides.pptx
+cd /path/to/tex2slides_agent
+PYTHONPATH=. python3 src/cli/main.py \
+  --input /path/to/paper.tex \
+  --out paper_slides.pptx \
+  --api-key YOUR_OPENAI_API_KEY
 ```
 
-Optional: export the generated PPTX to PDF using a headless LibreOffice if available:
+### With Template (Optional)
+
+Apply a custom PPTX template (preserves master slides and layout definitions):
 
 ```bash
-python main.py --input path/to/main.tex --api-key YOUR_OPENAI_API_KEY --out paper_slides.pptx --export-pdf
+PYTHONPATH=. python3 src/cli/main.py \
+  --input /path/to/paper.tex \
+  --out paper_slides.pptx \
+  --template /path/to/template.pptx \
+  --api-key YOUR_OPENAI_API_KEY
 ```
 
-If LibreOffice is not installed, the CLI will keep the PPTX output and report that PDF export was skipped.
+### With LLM Reflection (Optional)
 
-### Example: Planner + Refiner (Professor / Teaching POV)
+Enable iterative LLM-driven design critique and refinement:
 
-Use the `SlidePlanner` with a teaching perspective to produce slides tailored
-for classroom instruction, then optionally pass the draft to `SlideRefiner`
-to optimize pedagogical clarity.
+```bash
+PYTHONPATH=. python3 src/cli/main.py \
+  --input /path/to/paper.tex \
+  --out paper_slides.pptx \
+  --use-reflection \
+  --rounds 2 \
+  --api-key YOUR_OPENAI_API_KEY
+```
 
-Notes:
-- All provided figures will be included unless they are absolutely irrelevant.
-- For hard concepts, the planner will add an "analogy" slide immediately after
-  the technical slide. Analogy slides are marked with `"analogy": true` and
-  include an `"analogy_text"` field and `"analogy_color": "#FFDD00"` so
-  executors can render them with a distinct highlight color that the
-  professor can optionally skip or show.
+### Full Example with All Options
 
-Python snippet:
-
-```python
-from llm_agent import SlidePlanner, SlideRefiner
-
-planner = SlidePlanner(api_key="YOUR_OPENAI_API_KEY")
-refiner = SlideRefiner(api_key="YOUR_OPENAI_API_KEY")
-
-draft = planner.plan(
-    paper_title="Example Paper",
-    section_title="Method",
-    section_text="...",
-    figures=[],
-    include_all_figures=True,
-    analogy_level="10-year-old",
-)
-
-refined = refiner.refine(draft, include_all_figures=True, analogy_level="10-year-old", rounds=2)
-print(refined)
+```bash
+PYTHONPATH=. python3 src/cli/main.py \
+  --input /Users/dhruv/Documents/papers/transformer.tex \
+  --out transformer_slides.pptx \
+  --template /Users/dhruv/Documents/templates/corporate.pptx \
+  --use-reflection \
+  --rounds 3 \
+  --api-key sk-...
 ```
 
 ---
 
-## Features: Q&A Slides & References
+## CLI Options
 
-When using the professor perspective, the planner automatically includes Q&A slides and references.
-
-- Q&A slides are marked with `"qa_slide": true` (or `"qa_text"`) and appear after major sections to prompt discussion.
-- References are provided via a `"references"` array when applicable; each reference may be a string or an object with a `text` field.
-
-The PPTX executor renders these slide types with graceful fallbacks and modest styling metadata.
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--input` | str | **required** | Path to root LaTeX file |
+| `--out` | str | **required** | Output PPTX file path |
+| `--api-key` | str | `OPENAI_API_KEY` env | OpenAI API key |
+| `--template` | str | None | Optional PPTX template file (applies master layouts) |
+| `--use-reflection` | flag | False | Enable LLM-driven design reflection loop |
+| `--rounds` | int | 2 | Number of refinement rounds (Refiner and StyleAgent) |
 
 ---
 
-## Multi-Round Reflection with Critique Memory
+## Key Features Explained
 
-The `SlideRefiner` supports iterative refinement with **memory of past critiques**:
+### 1. Analogy Slides
+Automatically inserted for complex concepts. Rendered with:
+- Title: "Analogy: {concept}"
+- Font: Comic Sans MS, 28pt, bold, white
+- Background: #FFA46B (light orange)
+
+### 2. Q&A Slides
+Encourage reader engagement after major sections. Rendered with:
+- Title: "Q&A"
+- Font: Comic Sans MS, 28pt, bold, white
+- Background: #FFA46B
+
+### 3. Image Embedding
+Supported formats: PNG, JPG, SVG (PDFs gracefully skipped due to PPTX format limitations)
+- Automatically resolves figures from common folders: `Figures/`, `vis/`, `images/`
+- Adds figure as full slide
+
+### 4. Multi-Round Refinement
+The `SlideRefiner` iteratively improves slide plans:
+- Each round receives critique feedback from `SlideCritic`
+- Tracks critique history across rounds
+- Default 2 rounds; increase via `--rounds`
+
+### 5. LLM Reflection (Optional)
+The `StyleAgent.reflect_and_optimize()` runs advanced design critique:
+- Calls `SlideCritic` iteratively
+- Stops early if plan converges (no changes)
+- Applies deterministic cleanup (text sanitization, bullet optimization, text wrapping)
+- Enabled via `--use-reflection` flag
+
+### 6. Text Optimization (Automatic)
+- Removes LaTeX commands (`\thanks{}`, `\'e`, etc.)
+- Strips emoji Unicode
+- Converts Greek symbols (α, β) to readable text
+- Splits overly long bullets into sub-bullets
+- Wraps text to prevent slide overflow
+
+### 7. Template Support
+Pass an existing PPTX file with custom master slides, color schemes, and layouts:
+- Master slide definitions are preserved
+- Slide layouts are applied to generated slides
+- Fallback to default layouts if template unavailable
 
 ```python
 refined = refiner.refine(draft, rounds=3)  # 3 rounds of refinement

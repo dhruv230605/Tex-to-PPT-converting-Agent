@@ -162,20 +162,13 @@ class StyleAgent:
         return {'slides': slides, 'style_critiques': critiques}
 
     @classmethod
-    def reflect_and_optimize(cls, plan, api_key: str = None, max_rounds: int = 2, analogy_level: str = "10-year-old", include_all_figures: bool = True):
+    def reflect_and_optimize(cls, plan, api_key: str, max_rounds: int = 2, analogy_level: str = "10-year-old", include_all_figures: bool = True):
         """Run an LLM-driven reflection loop over `plan`, then apply deterministic optimizations.
 
-        If `api_key` is not provided, falls back to `optimize_plan` only.
+        Requires `api_key` to be provided for LLM critique.
 
-        Returns the same dict shape as `optimize_plan` but with additional
-        entries in `style_critiques` summarizing LLM feedback and iteration info.
+        Returns a dict with keys: 'slides' (list) and 'style_critiques' (list) summarizing LLM feedback and iteration info.
         """
-        # No API key -> deterministic path only
-        if not api_key:
-            result = cls.optimize_plan(plan)
-            result['style_critiques'].append('Reflection skipped (no api_key)')
-            return result
-
         critic = SlideCritic(api_key=api_key)
 
         # Normalize initial plan text

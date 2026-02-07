@@ -6,7 +6,7 @@ from src.parser.latex_parser import parse_latex
 from src.llm.slide_planner import SlidePlanner
 from src.llm.slide_refiner import SlideRefiner
 from src.llm.style_agent import StyleAgent
-from src.executors.pptx_executor import generate_pptx, export_to_pdf
+from src.executors.pptx_executor import generate_pptx
 
 # Optionally load .env
 try:
@@ -24,7 +24,6 @@ def main():
     parser.add_argument("--template", required=False, help="Optional .pptx template file to apply (masters/layouts/styles)")
     parser.add_argument("--out", required=True, help="Output .pptx file path")
     parser.add_argument("--rounds", type=int, default=2, help="Number of refinement rounds (default: 2)")
-    parser.add_argument("--export-pdf", action="store_true", help="Optionally export generated PPTX to PDF using LibreOffice headless if available")
     args = parser.parse_args()
 
     # Resolve API key: CLI arg > environment variable
@@ -71,13 +70,6 @@ def main():
 
     generate_pptx(metadata, slide_plans, image_base, str(out_path), template_path=args.template)
     print("✅ PPTX generated:", str(out_path))
-
-    if args.export_pdf:
-        pdf_path = export_to_pdf(str(out_path))
-        if pdf_path:
-            print("✅ Exported to PDF:", pdf_path)
-        else:
-            print("⚠️ LibreOffice not found or export failed; PPTX retained at:", str(out_path))
 
 if __name__ == "__main__":
     main()

@@ -37,10 +37,7 @@ For hard technical concepts or complex derivations, also generate a separate
 "analogy" slide immediately after the technical slide. The analogy slide
 should explain the idea at the level of a {analogy_level} using a clear,
 concrete metaphor or everyday example. Mark those slides with
-"analogy": true and include an "analogy_text" field. Also include
-"analogy_color": "#FFDD00" in the analogy slide metadata so executors can
-render it in a distinct highlight color that professors can skip or show
-as desired.
+"analogy": true and include an "analogy_text" field.
 
 For professor perspective, include a "Q&A" slide after major sections asking
 students questions, encouraging discussion, or prompting them to think about

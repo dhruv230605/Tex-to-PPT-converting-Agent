@@ -77,7 +77,7 @@ def generate_pptx(metadata, slide_plans, image_base, out_file, template_path: st
     This function is defensive: it supports multiple slide-plan shapes
     and falls back to plain text when styling or fields are missing.
     """
-    # If a template PowerPoint is provided, use it so masters/layouts/styles are preserved
+
     if template_path and os.path.exists(template_path):
         try:
             prs = Presentation(template_path)
@@ -133,7 +133,7 @@ def generate_pptx(metadata, slide_plans, image_base, out_file, template_path: st
         except Exception:
             pass
 
-    # NOTE: Abstract intentionally NOT included in slides (PPTX-first policy)
+    # NOTE: Abstract intentionally NOT included in slides
 
     def _iter_slides(plans):
         for plan in plans:
@@ -182,7 +182,6 @@ def generate_pptx(metadata, slide_plans, image_base, out_file, template_path: st
         # Analogy slide: render prominent analogy_text with accent and friendly layout
         if slide_data.get('analogy') or slide_data.get('analogy_text'):
             analogy_text = slide_data.get('analogy_text') or slide_data.get('text') or ''
-            # Enforce requested analogy slide format
             try:
                 # Title: "Analogy: {short title}"
                 short_title = slide_data.get('analogy_title') or (slide_data.get('title') or '').strip()
@@ -208,7 +207,7 @@ def generate_pptx(metadata, slide_plans, image_base, out_file, template_path: st
                 except Exception:
                     pass
 
-                # Background color as specified
+                # Background color is light otange here
                 try:
                     _apply_background(s, "#FFA46B")
                 except Exception:
@@ -224,10 +223,9 @@ def generate_pptx(metadata, slide_plans, image_base, out_file, template_path: st
 
             continue
 
-        # Q&A slides — use muted background and larger prompt text
+        # Q&A slides
         if slide_data.get('qa_slide') or slide_data.get('qa_text'):
             qa_text = slide_data.get('qa_text') or slide_data.get('text') or ''
-            # Enforce requested Q&A slide format
             try:
                 s.shapes.title.text = 'Q&A'
                 try:
@@ -366,146 +364,3 @@ def generate_pptx(metadata, slide_plans, image_base, out_file, template_path: st
                     img_slide.shapes.add_picture(fig_path, Inches(1), Inches(1), height=Inches(5))
                 except Exception:
                     pass
-
-    # Footer: small gray line with paper title
-    try:
-        footer_slide = prs.slides[0]
-        try:
-            left = Inches(0.3)
-            top = prs.slide_height - Inches(0.5)
-            width = prs.slide_width - Inches(0.6)
-            fh = footer_slide.shapes.add_textbox(left, top, width, Inches(0.3))
-            _safe_text_frame_set(fh, metadata.get('title', ''), font_size=10)
-            for p in fh.text_frame.paragraphs:
-                for r in p.runs:
-                    r.font.color.rgb = RGBColor(120, 120, 120)
-        except Exception:
-            pass
-    except Exception:
-        pass
-
-    # Save
-    prs.save(out_file)
-
-
-def export_to_pdf(pptx_path: str) -> Optional[str]:
-    """Attempt to export PPTX to PDF using LibreOffice headless.
-
-    Returns path to generated PDF on success, or None if LibreOffice
-    is not available or export failed.
-    """
-    if not os.path.exists(pptx_path):
-        return None
-
-    # Primary: LibreOffice (`soffice`)
-    soffice = shutil.which('soffice') or shutil.which('libreoffice')
-    if soffice:
-        out_dir = os.path.dirname(os.path.abspath(pptx_path)) or '.'
-        try:
-            subprocess.run([soffice, '--headless', '--convert-to', 'pdf', '--outdir', out_dir, pptx_path], check=False)
-            pdf_path = os.path.splitext(pptx_path)[0] + '.pdf'
-            if os.path.exists(pdf_path):
-                return pdf_path
-        except Exception:
-            pass
-
-    # Secondary: unoconv (some systems have unoconv installed)
-    unoconv = shutil.which('unoconv')
-    if unoconv:
-        try:
-            subprocess.run([unoconv, '-f', 'pdf', '-o', os.path.splitext(pptx_path)[0] + '.pdf', pptx_path], check=False)
-            pdf_path = os.path.splitext(pptx_path)[0] + '.pdf'
-            if os.path.exists(pdf_path):
-                return pdf_path
-        except Exception:
-            pass
-
-    # Fallback: Render a simple PDF using ReportLab by reading the PPTX content.
-    try:
-        from pptx import Presentation as _Presentation
-        from reportlab.pdfgen import canvas
-        from reportlab.lib.pagesizes import letter
-        from reportlab.lib.units import inch
-        import tempfile
-
-        prs = _Presentation(pptx_path)
-
-        # Use letter size for PDF pages; scale content to fit
-        page_w, page_h = letter
-        pdf_path = os.path.splitext(pptx_path)[0] + '.pdf'
-
-        c = canvas.Canvas(pdf_path, pagesize=letter)
-
-        for slide in prs.slides:
-            # Title extraction
-            title = ''
-            try:
-                if slide.shapes.title and slide.shapes.title.has_text_frame:
-                    title = '\n'.join([p.text for p in slide.shapes.title.text_frame.paragraphs if p.text])
-            except Exception:
-                title = ''
-
-            # Body text extraction (first text-containing placeholder)
-            body_lines = []
-            for shape in slide.shapes:
-                try:
-                    if shape.has_text_frame and shape.text_frame and (not shape == slide.shapes.title):
-                        for p in shape.text_frame.paragraphs:
-                            if p.text:
-                                body_lines.append(p.text)
-                except Exception:
-                    continue
-
-            # Draw title
-            c.setFont('Helvetica-Bold', 18)
-            c.drawString(0.5 * inch, page_h - 0.75 * inch, title[:200])
-
-            # Draw body lines
-            c.setFont('Helvetica', 12)
-            y = page_h - 1.25 * inch
-            for line in body_lines:
-                if y < 0.75 * inch:
-                    c.showPage()
-                    y = page_h - 0.75 * inch
-                    c.setFont('Helvetica', 12)
-                # wrap long lines simply
-                for chunk in [line[i:i+120] for i in range(0, len(line), 120)]:
-                    c.drawString(0.5 * inch, y, chunk)
-                    y -= 14
-
-            # Draw images present on slide
-            for shape in slide.shapes:
-                try:
-                    if shape.shape_type == 13 and hasattr(shape, 'image'):
-                        img = shape.image
-                        blob = img.blob
-                        # write to a temp file and draw
-                        with tempfile.NamedTemporaryFile(delete=False, suffix='.' + img.ext) as f:
-                            f.write(blob)
-                            tmpname = f.name
-                        # place image at next available Y
-                        try:
-                            c.drawImage(tmpname, 0.5 * inch, y - 4*inch, width=6*inch, preserveAspectRatio=True, mask='auto')
-                            y -= 4.25 * inch
-                        except Exception:
-                            pass
-                        finally:
-                            try:
-                                os.unlink(tmpname)
-                            except Exception:
-                                pass
-                except Exception:
-                    continue
-
-            c.showPage()
-
-        c.save()
-        if os.path.exists(pdf_path):
-            return pdf_path
-    except ImportError:
-        # ReportLab or python-pptx missing — cannot render fallback
-        return None
-    except Exception:
-        return None
-
-    return None

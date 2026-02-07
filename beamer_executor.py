@@ -1,1 +1,0 @@
-raise ImportError("beamer_executor.py has been removed. The project is PPTX-first; use pptx_executor.generate_pptx instead.")
