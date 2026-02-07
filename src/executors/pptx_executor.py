@@ -364,3 +364,6 @@ def generate_pptx(metadata, slide_plans, image_base, out_file, template_path: st
                     img_slide.shapes.add_picture(fig_path, Inches(1), Inches(1), height=Inches(5))
                 except Exception:
                     pass
+
+    # Save the presentation
+    prs.save(out_file)
