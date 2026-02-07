@@ -3,15 +3,12 @@ from openai import OpenAI
 import re
 
 
-class SlidePlanningAgent:
+class BaseLLMAgent:
     def __init__(self, api_key, model="gpt-4o-mini"):
         self.client = OpenAI(api_key=api_key)
         self.model = model
 
-    # ----------------------------
-    # Low-level LLM call
-    # ----------------------------
-    def _call_llm(self, system_prompt, user_prompt):
+    def _call_llm(self, system_prompt: str, user_prompt: str) -> str:
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -22,11 +19,7 @@ class SlidePlanningAgent:
         )
         return response.choices[0].message.content.strip()
 
-    # ----------------------------
-    # Robust JSON loader
-    # - removes ```json fences
-    # - escapes LaTeX backslashes
-    # ----------------------------
+
     def _safe_json_load(self, text: str):
         text = text.strip()
 
@@ -40,24 +33,16 @@ class SlidePlanningAgent:
 
         text = text.strip()
 
-        # 🔑 CRITICAL FIX:
-        # Escape single backslashes used in LaTeX math: \( \) \_
-        # This makes the string valid JSON
+        # Escape single backslashes used in LaTeX math so JSON loads
         text = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', text)
 
         return json.loads(text)
 
-    # ----------------------------
-    # Planner + Reflection Agent
-    # ----------------------------
-    def plan_and_refine(
-        self,
-        paper_title: str,
-        section_title: str,
-        section_text: str,
-        figures: list,
-    ):
-        # ---------- STEP 1: PLANNING ----------
+
+class SlidePlanner(BaseLLMAgent):
+    """Produces an initial slide plan (JSON) from a paper section."""
+
+    def plan(self, paper_title: str, section_title: str, section_text: str, figures: list):
         planning_prompt = f"""
 You are an expert academic slide designer.
 
@@ -103,7 +88,22 @@ JSON schema:
             user_prompt=planning_prompt,
         )
 
-        # ---------- STEP 2: REFLECTION ----------
+        try:
+            return self._safe_json_load(draft)
+        except Exception:
+            raise RuntimeError("Failed to parse JSON from planning step.\n\nRaw LLM output:\n" + draft)
+
+
+class SlideRefiner(BaseLLMAgent):
+    """Takes a draft slide plan (JSON string or dict) and returns an improved plan."""
+
+    def refine(self, draft_plan: str):
+        # Accept dicts as well as raw strings
+        if isinstance(draft_plan, dict):
+            draft_text = json.dumps(draft_plan)
+        else:
+            draft_text = str(draft_plan)
+
         reflection_prompt = f"""
 You are a reflection and optimization agent.
 
@@ -123,7 +123,7 @@ Output ONLY improved JSON using the SAME schema.
 Do NOT add explanations.
 
 Draft slide plan:
-{draft}
+{draft_text}
 """
 
         refined = self._call_llm(
@@ -133,9 +133,6 @@ Draft slide plan:
 
         try:
             return self._safe_json_load(refined)
-        except Exception as e:
-            raise RuntimeError(
-                "❌ Failed to parse JSON from reflection step.\n\n"
-                "Raw LLM output:\n"
-                f"{refined}"
-            ) from e
+        except Exception:
+            raise RuntimeError("Failed to parse JSON from reflection step.\n\nRaw LLM output:\n" + refined)
+
