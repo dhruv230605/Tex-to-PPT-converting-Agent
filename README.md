@@ -177,7 +177,7 @@ draft = planner.plan(
     analogy_level="10-year-old",
 )
 
-refined = refiner.refine(draft, include_all_figures=True, analogy_level="10-year-old")
+refined = refiner.refine(draft, include_all_figures=True, analogy_level="10-year-old", rounds=2)
 print(refined)
 ```
 
@@ -197,6 +197,24 @@ When using the professor perspective, the planner automatically includes:
   
   References appear in smaller text at the bottom of slides. Paper citations take priority;
   AI-generated additions are clearly labeled so instructors can decide whether to include them.
+
+---
+
+## Multi-Round Reflection with Critique Memory
+
+The `SlideRefiner` supports iterative refinement with **memory of past critiques**:
+
+```python
+refined = refiner.refine(draft, rounds=3)  # 3 rounds of refinement
+```
+
+Each round:
+- Receives the previous round's output as input
+- Has access to critique history from all prior rounds
+- Focuses on addressing remaining issues while building on past improvements
+- Outputs a refined plan and brief critique summary
+
+Default: 2 rounds. Increase `rounds` for more thorough optimization on complex sections.
 
 ---
 

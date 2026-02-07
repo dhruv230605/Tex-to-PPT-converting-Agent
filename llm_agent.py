@@ -159,47 +159,76 @@ JSON schema examples:
 
 
 class SlideRefiner(BaseLLMAgent):
-    """Takes a draft slide plan (JSON string or dict) and returns an improved plan."""
+    """Takes a draft slide plan (JSON string or dict) and returns an improved plan.
+    
+    Supports multiple rounds of refinement with critique memory.
+    """
 
-    def refine(self, draft_plan: str, include_all_figures: bool = True, analogy_level: str = "10-year-old"):
+    def refine(self, draft_plan: str, include_all_figures: bool = True, analogy_level: str = "10-year-old", rounds: int = 2):
+        """Refine a slide plan through multiple rounds of reflection.
+        
+        Args:
+            draft_plan: Initial slide plan (JSON string or dict)
+            include_all_figures: Whether to include all figures
+            analogy_level: Level for analogy explanations
+            rounds: Number of refinement rounds (default: 2)
+        
+        Returns:
+            Refined slide plan (dict)
+        """
         # Accept dicts as well as raw strings
         if isinstance(draft_plan, dict):
-            draft_text = json.dumps(draft_plan)
+            current_plan = draft_plan
+            current_text = json.dumps(draft_plan)
         else:
-            draft_text = str(draft_plan)
+            current_text = str(draft_plan)
+            current_plan = self._safe_json_load(current_text)
 
-        # Optimize for professor teaching POV
-        perspective_block = (
-            "\n\nPerspective: Professor / Teaching\n\n"
-            "Emphasize clarity for learners, ensure learning objectives are clear,"
-            " and suggest pedagogical adjustments."
-        )
+        critique_history = []  # Track critiques across rounds
 
-        figures_block = "\n\nInclude ALL provided figures unless they are absolutely irrelevant.\n" if include_all_figures else "\n\nDo not force inclusion of all figures; include only helpful ones.\n"
+        for round_num in range(1, rounds + 1):
+            current_text = json.dumps(current_plan) if isinstance(current_plan, dict) else str(current_plan)
 
-        analogy_block = (
-            f"\n\nFor any hard technical concept, add an analogy slide explaining the idea at the level of a {analogy_level}.\n"
-            "Mark analogy slides with \"analogy\": true, include an \"analogy_text\" field, and set \"analogy_color\": \"#FFDD00\" in metadata.\n"
-            "Place each analogy slide immediately after the technical slide it explains.\n"
-        )
+            # Build critique history context
+            history_context = ""
+            if critique_history:
+                history_context = "\n\nPrevious Refinement Rounds:\n"
+                for i, critique in enumerate(critique_history, 1):
+                    history_context += f"\nRound {i} Focus:\n{critique}\n"
+                history_context += "\nBuild on these improvements and address remaining issues."
 
-        qa_block = (
-            "\n\nFor professor perspective, after major sections, insert a \"Q&A\" slide with questions for discussion.\n"
-            "Mark Q&A slides with \"qa_slide\": true and include a \"qa_text\" field with the discussion prompt.\n"
-        )
+            # Optimize for professor teaching POV
+            perspective_block = (
+                "\n\nPerspective: Professor / Teaching\n\n"
+                "Emphasize clarity for learners, ensure learning objectives are clear,"
+                " and suggest pedagogical adjustments."
+            )
 
-        references_block = (
-            "\n\nInclude references as appropriate (not on every slide). For each reference:\n"
-            "- If from the paper, use {\"type\": \"paper\", \"source\": \"Paper: [section]\", \"text\": \"...\"}\n"
-            "- If external source, use {\"type\": \"external\", \"source\": \"[name]\", \"text\": \"...\"}\n"
-            "- If AI-generated, use {\"type\": \"ai_recommendation\", \"source\": \"AI-generated\", \"text\": \"...\"}\n"
-            "References will appear in smaller text at the bottom of slides.\n"
-        )
+            figures_block = "\n\nInclude ALL provided figures unless they are absolutely irrelevant.\n" if include_all_figures else "\n\nDo not force inclusion of all figures; include only helpful ones.\n"
 
-        reflection_prompt = f"""
-You are a reflection and optimization agent.
+            analogy_block = (
+                f"\n\nFor any hard technical concept, add an analogy slide explaining the idea at the level of a {analogy_level}.\n"
+                "Mark analogy slides with \"analogy\": true, include an \"analogy_text\" field, and set \"analogy_color\": \"#FFDD00\" in metadata.\n"
+                "Place each analogy slide immediately after the technical slide it explains.\n"
+            )
 
-Improve the slide plan below to maximize slide quality.
+            qa_block = (
+                "\n\nFor professor perspective, after major sections, insert a \"Q&A\" slide with questions for discussion.\n"
+                "Mark Q&A slides with \"qa_slide\": true and include a \"qa_text\" field with the discussion prompt.\n"
+            )
+
+            references_block = (
+                "\n\nInclude references as appropriate (not on every slide). For each reference:\n"
+                "- If from the paper, use {\"type\": \"paper\", \"source\": \"Paper: [section]\", \"text\": \"...\"}\n"
+                "- If external source, use {\"type\": \"external\", \"source\": \"[name]\", \"text\": \"...\"}\n"
+                "- If AI-generated, use {\"type\": \"ai_recommendation\", \"source\": \"AI-generated\", \"text\": \"...\"}\n"
+                "References will appear in smaller text at the bottom of slides.\n"
+            )
+
+            reflection_prompt = f"""
+You are a reflection and optimization agent in round {round_num} of {rounds}.
+
+Your goal: Improve the slide plan below to maximize slide quality.
 
 Check for:
 1. Missing important ideas
@@ -207,7 +236,7 @@ Check for:
 3. Overloaded or unclear bullets
 4. Redundant content
 5. Incorrect or unnecessary figures
-6. Academic clarity and precision
+6. Academic clarity and precision{history_context}
 
 Revise the plan if needed.
 
@@ -216,21 +245,45 @@ Revise the plan if needed.
 {qa_block}
 {references_block}
 
-Output ONLY improved JSON using the SAME schema.
-Do NOT add explanations.
+At the end of your response, before outputting JSON, briefly state what you improved in THIS round (focus areas).
+
+Output ONLY improved JSON using the SAME schema, preceded by a brief critique summary.
 
 Draft slide plan:
-{draft_text}
+{current_text}
 {perspective_block}
 """
 
-        refined = self._call_llm(
-            system_prompt="You critique and refine academic slide plans.",
-            user_prompt=reflection_prompt,
-        )
+            result = self._call_llm(
+                system_prompt="You critique and refine academic slide plans with multi-round reflection.",
+                user_prompt=reflection_prompt,
+            )
+
+            # Extract critique summary and JSON
+            critique_summary = ""
+            json_part = result
+
+            # Try to extract critique from response (text before JSON)
+            if "```json" in result or "{" in result:
+                parts = result.split("{", 1)
+                if len(parts) > 1:
+                    critique_summary = parts[0].strip()
+                    json_part = "{" + parts[1]
+            else:
+                # No clear JSON structure, assume entire response is critique/explanation
+                critique_summary = result
+
+            # Store this round's critique
+            if critique_summary:
+                critique_history.append(f"Round {round_num}: {critique_summary[:200]}")  # Store first 200 chars
+
+            try:
+                current_plan = self._safe_json_load(json_part)
+            except Exception:
+                raise RuntimeError(f"Failed to parse JSON from reflection round {round_num}.\n\nRaw LLM output:\n{result}")
 
         try:
-            return self._safe_json_load(refined)
+            return self._safe_json_load(json.dumps(current_plan))
         except Exception:
-            raise RuntimeError("Failed to parse JSON from reflection step.\n\nRaw LLM output:\n" + refined)
+            raise RuntimeError("Failed to parse final refined plan.\n\nRaw LLM output:\n" + json.dumps(current_plan))
 
