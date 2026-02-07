@@ -5,6 +5,7 @@ import os
 import subprocess
 import shutil
 from typing import Optional
+import re
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
@@ -13,6 +14,23 @@ import os
 import subprocess
 import shutil
 from typing import Optional, Iterable
+
+
+def _strip_latex(text: str) -> str:
+    """Remove LaTeX commands and escape sequences from text."""
+    if not text:
+        return ''
+    # Remove \thanks{...} and similar commands
+    text = re.sub(r'\\[a-zA-Z]+\*?\{[^}]*\}', '', text)
+    # Remove other LaTeX commands
+    text = re.sub(r'\\[a-zA-Z]+\*?(?:\[[^\]]*\])?', '', text)
+    # Replace \' and \" escape sequences (e.g., \\'e -> e)
+    text = re.sub(r"\\['\"`^~]([a-zA-Z])", r'\1', text)
+    # Remove remaining backslashes and braces
+    text = text.replace('\\', '').replace('{', '').replace('}', '')
+    # Clean up whitespace and line breaks
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
 
 def _hex_to_rgb(hex_color: str):
@@ -98,13 +116,17 @@ def generate_pptx(metadata, slide_plans, image_base, out_file, template_path: st
             _safe_text_frame_set(slide.shapes[0], title, font_size=44)
     if author:
         try:
+            # Clean LaTeX commands from author text
+            clean_author = _strip_latex(author)
             # placeholder 1 is usually subtitle/author
-            slide.placeholders[1].text = author
+            slide.placeholders[1].text = clean_author
             try:
                 ph = slide.placeholders[1]
+                # Reduce font size and set word wrap to prevent overlap
                 for p in ph.text_frame.paragraphs:
+                    p.word_wrap = True
                     for r in p.runs:
-                        r.font.size = Pt(18)
+                        r.font.size = Pt(12)
                         r.font.italic = True
             except Exception:
                 pass
@@ -307,19 +329,25 @@ def generate_pptx(metadata, slide_plans, image_base, out_file, template_path: st
                     return None
 
                 candidates = []
-                # If name already includes extension, try it directly
-                candidates.append(os.path.join(image_base, name))
-
                 base_no_ext, ext = os.path.splitext(name)
-                if not ext:
-                    for e in ('.png', '.jpg', '.jpeg', '.pdf', '.svg'):
+                
+                # If name already includes extension
+                if ext:
+                    # Skip PDFs - python-pptx can't embed them directly
+                    if ext.lower() == '.pdf':
+                        return None
+                    candidates.append(os.path.join(image_base, name))
+                else:
+                    # No extension: try common image formats (PNG/JPG first, skip PDF)
+                    for e in ('.png', '.jpg', '.jpeg', '.svg'):
                         candidates.append(os.path.join(image_base, base_no_ext + e))
 
                 # Also try common subfolders
                 for folder in ('Figures', 'figures', 'vis', 'images'):
-                    candidates.append(os.path.join(image_base, folder, name))
-                    if not ext:
-                        for e in ('.png', '.jpg', '.jpeg', '.pdf', '.svg'):
+                    if ext:
+                        candidates.append(os.path.join(image_base, folder, name))
+                    else:
+                        for e in ('.png', '.jpg', '.jpeg', '.svg'):
                             candidates.append(os.path.join(image_base, folder, base_no_ext + e))
 
                 # Deduplicate while preserving order
